@@ -1,62 +1,138 @@
 // ============================================================
-// Myra AdBlock - Background Service Worker
+//  Myra AdBlock - Background Service Worker (Enhanced)
+//  Tracks blocked ads & trackers separately
 // ============================================================
 
-// Track blocked requests count
-let totalBlocked = 0;
+// Stats tracking
+let stats = {
+  totalBlocked: 0,
+  adsBlocked: 0,
+  trackersBlocked: 0,
+  todayBlocked: 0,
+  lastResetDate: new Date().toDateString(),
+  domainStats: {}  // per-domain stats
+};
 
-// Initialize blocked count from storage
-chrome.storage.local.get(['totalBlocked', 'enabled', 'whitelist'], (result) => {
-  if (result.totalBlocked !== undefined) {
-    totalBlocked = result.totalBlocked;
-  }
-  if (result.enabled === undefined) {
-    chrome.storage.local.set({ enabled: true });
-  }
-  if (result.whitelist === undefined) {
-    chrome.storage.local.set({ whitelist: [] });
-  }
-});
+// Known ad domains for categorization
+const AD_DOMAINS = [
+  'doubleclick.net', 'googlesyndication.com', 'googleadservices.com',
+  'adservice.google.com', 'pagead2.googlesyndication.com', 'ads.youtube.com',
+  'amazon-adsystem.com', 'ads.yahoo.com', 'ad.doubleclick.net',
+  'ads-twitter.com', 'ads.linkedin.com', 'adnxs.com', 'taboola.com',
+  'outbrain.com', 'criteo.com', 'popads.net', 'popcash.net', 'adcolony.com',
+  'pubmatic.com', 'openx.net', 'rubiconproject.com', 'casalemedia.com',
+  'serving-sys.com', 'moatads.com', 'adrecover.com', 'adblade.com',
+  'zedo.com', 'revjet.com', 'trafficjunky.com', 'juicyads.com',
+  'exoclick.com', 'mgid.com', 'propellerads.com', 'hilltopads.com',
+  'clickadu.com', 'adsterra.com', 'infolinks.com', 'mediavine.com',
+  'monumetric.com', 'vungle.com', 'applovin.com', 'chartboost.com'
+];
 
-// Listen for blocked requests via declarativeNetRequest
-chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
-  totalBlocked++;
-  // Save periodically (every 10 blocks to reduce storage writes)
-  if (totalBlocked % 10 === 0) {
-    chrome.storage.local.set({ totalBlocked });
+const TRACKER_DOMAINS = [
+  'facebook.com/tr', 'connect.facebook.net', 'analytics.google.com',
+  'google-analytics.com', 'hotjar.com', 'clarity.ms', 'mixpanel.com',
+  'segment.com', 'amplitude.com', 'fullstory.com', 'mouseflow.com',
+  'crazyegg.com', 'luckyorange.com', 'matomo.org', 'pixel.facebook.com',
+  'snap.licdn.com', 'bat.bing.com', 't.co/i/adsct'
+];
+
+function isAdDomain(url) {
+  return AD_DOMAINS.some(d => url.includes(d));
+}
+
+function isTrackerDomain(url) {
+  return TRACKER_DOMAINS.some(d => url.includes(d));
+}
+
+// Initialize from storage
+chrome.storage.local.get(['stats'], (result) => {
+  if (result.stats) {
+    stats = { ...stats, ...result.stats };
+    // Reset daily count if new day
+    if (stats.lastResetDate !== new Date().toDateString()) {
+      stats.todayBlocked = 0;
+      stats.lastResetDate = new Date().toDateString();
+    }
   }
-  // Update badge
   updateBadge();
 });
 
-function updateBadge() {
-  const text = totalBlocked > 999 ? '999+' : String(totalBlocked);
-  chrome.action.setBadgeText({ text });
-  chrome.action.setBadgeBackgroundColor({ color: '#e74c3c' });
+// Listen for declarativeNetRequest rule matches
+if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
+  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
+    const url = info.request.url || '';
+    const tabId = info.request.tabId;
+
+    stats.totalBlocked++;
+
+    if (isAdDomain(url)) {
+      stats.adsBlocked++;
+    } else if (isTrackerDomain(url)) {
+      stats.trackersBlocked++;
+    } else {
+      stats.adsBlocked++; // default to ads
+    }
+
+    stats.todayBlocked++;
+
+    // Per-tab stats
+    if (tabId && tabId > 0) {
+      const domain = getDomainFromUrl(url);
+      if (domain) {
+        if (!stats.domainStats[domain]) {
+          stats.domainStats[domain] = 0;
+        }
+        stats.domainStats[domain]++;
+      }
+    }
+
+    // Save every 5 blocks
+    if (stats.totalBlocked % 5 === 0) {
+      saveStats();
+    }
+    updateBadge();
+  });
 }
 
-// Handle messages from popup and content scripts
+// Also track via webNavigation for content script blocks
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case 'GET_STATS':
-      sendResponse({ totalBlocked });
+      sendResponse({ stats });
+      break;
+
+    case 'CONTENT_BLOCKED':
+      // Content script reported blocked elements
+      const count = message.count || 0;
+      stats.totalBlocked += count;
+      stats.adsBlocked += count;
+      stats.todayBlocked += count;
+      saveStats();
+      updateBadge();
+      sendResponse({ success: true });
       break;
 
     case 'RESET_STATS':
-      totalBlocked = 0;
-      chrome.storage.local.set({ totalBlocked: 0 });
+      stats = {
+        totalBlocked: 0,
+        adsBlocked: 0,
+        trackersBlocked: 0,
+        todayBlocked: 0,
+        lastResetDate: new Date().toDateString(),
+        domainStats: {}
+      };
+      saveStats();
       updateBadge();
       sendResponse({ success: true });
       break;
 
     case 'TOGGLE_ENABLED':
       chrome.storage.local.get(['enabled'], (result) => {
-        const newState = !result.enabled;
+        const newState = !(result.enabled !== false);
         chrome.storage.local.set({ enabled: newState });
-        updateDynamicRules(newState);
         sendResponse({ enabled: newState });
       });
-      return true; // async response
+      return true;
 
     case 'GET_ENABLED':
       chrome.storage.local.get(['enabled'], (result) => {
@@ -89,46 +165,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ whitelist: result.whitelist || [] });
       });
       return true;
-
-    case 'BLOCK_ELEMENT':
-      // Forward to content script to hide an element
-      chrome.tabs.sendMessage(message.tabId, {
-        type: 'HIDE_ELEMENT',
-        selector: message.selector
-      });
-      sendResponse({ success: true });
-      break;
   }
 });
 
-// Toggle all dynamic rules on/off
-async function updateDynamicRules(enabled) {
+function saveStats() {
+  chrome.storage.local.set({ stats });
+}
+
+function updateBadge() {
+  const text = stats.totalBlocked > 999 ? '999+' : String(stats.totalBlocked);
+  chrome.action.setBadgeText({ text });
+  chrome.action.setBadgeBackgroundColor({ color: '#e74c3c' });
+}
+
+function getDomainFromUrl(url) {
   try {
-    const rules = await chrome.declarativeNetRequest.getDynamicRules();
-    if (enabled) {
-      // Re-enable rules
-      const updateRules = rules.map(r => ({
-        id: r.id,
-        priority: r.priority,
-        action: r.action,
-        condition: r.condition
-      }));
-      if (updateRules.length > 0) {
-        await chrome.declarativeNetRequest.updateDynamicRules({
-          removeRuleIds: rules.map(r => r.id),
-          addRules: updateRules
-        });
-      }
-    } else {
-      // Disable all rules
-      await chrome.declarativeNetRequest.updateDynamicRules({
-        removeRuleIds: rules.map(r => r.id)
-      });
-    }
-  } catch (e) {
-    console.error('Error updating rules:', e);
+    return new URL(url).hostname;
+  } catch {
+    return null;
   }
 }
 
-// Initialize badge on startup
+// Initialize badge
 updateBadge();
