@@ -1,0 +1,114 @@
+/* ============================================================
+   Myra AdBlock - Content Script CSS
+   Cosmetic ad hiding + Element picker styles
+   ============================================================ */
+
+/* ---- Ad Hiding Rules ---- */
+[id*="ad-container"],
+[id*="ad-wrapper"],
+[id*="ad-banner"],
+[id*="ad-slot"],
+[id*="google_ads"],
+[class*="ad-container"],
+[class*="ad-wrapper"],
+[class*="ad-banner"],
+[class*="ad-slot"],
+[class*="ad-unit"],
+[class*="advert"],
+[class*="sponsored"],
+[class*="promoted"],
+ins.adsbygoogle,
+[data-ad-client],
+[data-ad-slot],
+.google-auto-placed,
+#google_ads_frame,
+.adsbygoogle,
+iframe[src*="doubleclick.net"],
+iframe[src*="googlesyndication"],
+iframe[src*="adserver"],
+[data-testid="placementTracking"],
+article[data-promoted="true"],
+[class*="taboola"],
+[class*="outbrain"],
+.OUTBRAIN,
+div[id^="crt-"],
+div[id^="trc_"],
+amp-ad,
+amp-embed[type="ad"] {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ---- YouTube Ad Hiding ---- */
+.video-ads,
+.ytp-ad-module,
+.ytp-ad-overlay-container,
+.ytp-ad-text-overlay,
+#player-ads,
+.ytd-promoted-sparkles-web-renderer,
+.ytd-ad-slot-renderer,
+.ytd-in-feed-ad-layout-renderer,
+.ytd-banner-promo-renderer,
+ytd-ad-slot-renderer,
+ytd-promoted-sparkles-web-renderer,
+ytd-in-feed-ad-layout-renderer,
+ytd-statement-banner-renderer,
+#masthead-ad {
+  display: none !important;
+}
+
+/* ---- Floating/Sticky Ad Hiding ---- */
+[class*="sticky-ad"],
+[class*="floating-ad"],
+[class*="fixed-ad"],
+[class*="popup-ad"],
+[class*="modal-ad"],
+[class*="interstitial"] {
+  display: none !important;
+}
+
+/* ---- Cookie Banner Hiding ---- */
+[class*="cookie-banner"],
+[id*="onetrust-consent-sdk"],
+[class*="cookie-consent"],
+[class*="gdpr-banner"] {
+  display: none !important;
+}
+
+/* ---- Element Picker Overlay ---- */
+#myra-picker-overlay {
+  position: fixed !important;
+  pointer-events: none !important;
+  z-index: 2147483647 !important;
+  border: 2px solid #e74c3c !important;
+  background: rgba(231, 76, 60, 0.15) !important;
+  transition: all 0.1s ease !important;
+  border-radius: 4px !important;
+}
+
+/* ---- Element Picker Banner ---- */
+#myra-picker-banner {
+  position: fixed !important;
+  top: 10px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 2147483647 !important;
+  background: linear-gradient(135deg, #2c3e50, #34495e) !important;
+  color: white !important;
+  padding: 12px 24px !important;
+  border-radius: 10px !important;
+  font-family: 'Segoe UI', Arial, sans-serif !important;
+  font-size: 14px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  pointer-events: none !important;
+  animation: myraSlideDown 0.3s ease-out !important;
+}
+
+@keyframes myraSlideDown {
+  from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
