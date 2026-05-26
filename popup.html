@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Myra AdBlock</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo-row">
+        <div class="logo-icon">🛡️</div>
+        <div>
+          <h1 class="logo-text">Myra <span class="highlight">AdBlock</span></h1>
+          <p class="version">v1.0.0</p>
+        </div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="masterToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Live Counter -->
+    <div class="stats-hero">
+      <div class="pulse-ring"></div>
+      <div class="stats-number" id="totalBlocked">0</div>
+      <div class="stats-label">Blocked Today</div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card ads-card">
+        <div class="stat-icon">📢</div>
+        <div class="stat-value" id="adsBlocked">0</div>
+        <div class="stat-label">Ads</div>
+      </div>
+      <div class="stat-card trackers-card">
+        <div class="stat-icon">👁️</div>
+        <div class="stat-value" id="trackersBlocked">0</div>
+        <div class="stat-label">Trackers</div>
+      </div>
+      <div class="stat-card total-card">
+        <div class="stat-icon">🛡️</div>
+        <div class="stat-value" id="allTimeBlocked">0</div>
+        <div class="stat-label">All Time</div>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-section">
+      <div class="progress-label">
+        <span>Protection Level</span>
+        <span class="protection-text" id="protectionText">Maximum</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+        <div class="progress-glow"></div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="actions">
+      <button class="action-btn" id="elementPickerBtn" title="Pick element to block">
+        <span class="btn-icon">🎯</span>
+        <span>Pick Element</span>
+      </button>
+      <button class="action-btn" id="whitelistBtn" title="Whitelist this site">
+        <span class="btn-icon">✅</span>
+        <span>Whitelist</span>
+      </button>
+      <button class="action-btn" id="resetBtn" title="Reset statistics">
+        <span class="btn-icon">🔄</span>
+        <span>Reset</span>
+      </button>
+    </div>
+
+    <!-- Current Site Info -->
+    <div class="site-info">
+      <div class="site-status" id="siteStatus">
+        <span class="status-dot active"></span>
+        <span class="site-domain" id="currentDomain">Loading...</span>
+      </div>
+      <div class="site-blocked" id="siteBlocked">0 blocked on this page</div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>Made with ❤️ by Myra</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
