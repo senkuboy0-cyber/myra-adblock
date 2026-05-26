@@ -1,128 +1,136 @@
 // ============================================================
-//  Myra AdBlock - Popup Script (Enhanced)
-//  Animated stats, toggle, whitelist, element picker
+//  Myra AdBlock - Popup Script (Enhanced v2)
+//  Animated counters • Stats • Toggle • Whitelist
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  const totalEl = document.getElementById('totalBlocked');
-  const adsEl = document.getElementById('adsBlocked');
-  const trackersEl = document.getElementById('trackersBlocked');
-  const allTimeEl = document.getElementById('allTimeBlocked');
-  const progressFill = document.getElementById('progressFill');
-  const protectionText = document.getElementById('protectionText');
-  const masterToggle = document.getElementById('masterToggle');
-  const elementPickerBtn = document.getElementById('elementPickerBtn');
-  const whitelistBtn = document.getElementById('whitelistBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const currentDomainEl = document.getElementById('currentDomain');
-  const siteBlockedEl = document.getElementById('siteBlocked');
-  const statusDot = document.querySelector('.status-dot');
+  const $ = id => document.getElementById(id);
 
-  // ---- Animated Counter ----
-  function animateCount(element, target, duration = 800) {
-    const start = parseInt(element.textContent) || 0;
+  const totalEl      = $('totalBlocked');
+  const adsEl        = $('adsBlocked');
+  const trackersEl   = $('trackersBlocked');
+  const allTimeEl    = $('allTimeBlocked');
+  const progressFill = $('progressFill');
+  const protection   = $('protectionText');
+  const toggle       = $('masterToggle');
+  const pickerBtn    = $('elementPickerBtn');
+  const whitelistBtn = $('whitelistBtn');
+  const resetBtn     = $('resetBtn');
+  const domainEl     = $('currentDomain');
+  const siteBlockedEl= $('siteBlocked');
+  const statusDot    = document.querySelector('.status-dot');
+
+  // ---- Animated Number Counter ----
+  function animateTo(el, target, duration = 900) {
+    const start = parseInt(el.textContent.replace(/,/g, '')) || 0;
+    if (start === target) return;
     const diff = target - start;
-    if (diff === 0) return;
+    const t0 = performance.now();
 
-    const startTime = performance.now();
-
-    function update(currentTime) {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // Ease out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(start + diff * eased);
-      element.textContent = current.toLocaleString();
-
-      if (progress < 1) {
-        requestAnimationFrame(update);
-      } else {
-        element.textContent = target.toLocaleString();
-        element.classList.add('counting');
-        setTimeout(() => element.classList.remove('counting'), 300);
+    function tick(now) {
+      const p = Math.min((now - t0) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3); // ease-out cubic
+      el.textContent = Math.round(start + diff * ease).toLocaleString();
+      if (p < 1) requestAnimationFrame(tick);
+      else {
+        el.textContent = target.toLocaleString();
+        el.classList.add('counting');
+        setTimeout(() => el.classList.remove('counting'), 350);
       }
     }
-
-    requestAnimationFrame(update);
+    requestAnimationFrame(tick);
   }
 
   // ---- Load Stats ----
   function loadStats() {
-    chrome.runtime.sendMessage({ type: 'GET_STATS' }, (response) => {
-      if (!response || !response.stats) return;
-      const s = response.stats;
+    chrome.runtime.sendMessage({ type: 'GET_STATS' }, res => {
+      if (!res?.stats) return;
+      const s = res.stats;
 
-      animateCount(totalEl, s.todayBlocked || 0);
-      animateCount(adsEl, s.adsBlocked || 0);
-      animateCount(trackersEl, s.trackersBlocked || 0);
-      animateCount(allTimeEl, s.totalBlocked || 0);
+      animateTo(totalEl,    s.todayBlocked || 0);
+      animateTo(adsEl,      s.adsBlocked   || 0);
+      animateTo(trackersEl, s.trackersBlocked || 0);
+      animateTo(allTimeEl,  s.totalBlocked || 0);
 
-      // Progress bar based on blocked count
-      const total = s.totalBlocked || 0;
-      let percent = Math.min((total / 500) * 100, 100);
-      setTimeout(() => {
-        progressFill.style.width = percent + '%';
-      }, 300);
+      // Progress bar
+      const pct = Math.min((s.totalBlocked || 0) / 500 * 100, 100);
+      setTimeout(() => { progressFill.style.width = pct + '%'; }, 400);
 
-      // Protection text
-      if (total > 1000) {
-        protectionText.textContent = 'Maximum';
-        protectionText.style.color = '#2ecc71';
-      } else if (total > 500) {
-        protectionText.textContent = 'High';
-        protectionText.style.color = '#3498db';
-      } else if (total > 100) {
-        protectionText.textContent = 'Medium';
-        protectionText.style.color = '#f39c12';
-      } else {
-        protectionText.textContent = 'Building';
-        protectionText.style.color = '#e74c3c';
-      }
+      // Protection level text
+      const t = s.totalBlocked || 0;
+      if (t > 1000)      { protection.textContent = 'Maximum';  protection.style.color = '#2ed573'; }
+      else if (t > 500)  { protection.textContent = 'High';     protection.style.color = '#1e90ff'; }
+      else if (t > 100)  { protection.textContent = 'Medium';   protection.style.color = '#ffa502'; }
+      else               { protection.textContent = 'Building'; protection.style.color = '#ff4757'; }
     });
   }
 
-  // ---- Load Enabled State ----
-  function loadEnabled() {
-    chrome.runtime.sendMessage({ type: 'GET_ENABLED' }, (response) => {
-      if (!response) return;
-      masterToggle.checked = response.enabled;
-      if (!response.enabled) {
-        document.body.classList.add('disabled');
-      } else {
-        document.body.classList.remove('disabled');
-      }
+  // ---- Load Toggle State ----
+  function loadToggle() {
+    chrome.runtime.sendMessage({ type: 'GET_ENABLED' }, res => {
+      if (!res) return;
+      toggle.checked = res.enabled;
+      document.body.classList.toggle('disabled', !res.enabled);
     });
   }
 
   // ---- Toggle On/Off ----
-  masterToggle.addEventListener('change', () => {
-    chrome.runtime.sendMessage({ type: 'TOGGLE_ENABLED' }, (response) => {
-      if (response) {
-        masterToggle.checked = response.enabled;
-        if (response.enabled) {
-          document.body.classList.remove('disabled');
-        } else {
-          document.body.classList.add('disabled');
-        }
+  toggle.addEventListener('change', () => {
+    chrome.runtime.sendMessage({ type: 'TOGGLE_ENABLED' }, res => {
+      if (res) {
+        toggle.checked = res.enabled;
+        document.body.classList.toggle('disabled', !res.enabled);
       }
     });
   });
 
-  // ---- Get Current Tab Domain ----
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0] && tabs[0].url) {
+  // ---- Get Current Tab ----
+  chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+    if (tabs[0]?.url) {
       try {
-        const url = new URL(tabs[0].url);
-        currentDomainEl.textContent = url.hostname;
-      } catch {
-        currentDomainEl.textContent = 'N/A';
-      }
+        const u = new URL(tabs[0].url);
+        domainEl.textContent = u.hostname;
+        checkWhitelist(u.hostname);
+      } catch { domainEl.textContent = 'N/A'; }
     }
   });
 
+  // ---- Whitelist ----
+  function checkWhitelist(domain) {
+    chrome.runtime.sendMessage({ type: 'GET_WHITELIST' }, res => {
+      const wl = res?.whitelist || [];
+      if (wl.includes(domain)) {
+        whitelistBtn.querySelector('.btn-icon').textContent = '❌';
+        whitelistBtn.querySelector('span:last-child').textContent = 'Unwhitelist';
+        statusDot?.classList.remove('active');
+      }
+    });
+  }
+
+  whitelistBtn.addEventListener('click', () => {
+    const domain = domainEl.textContent;
+    if (!domain || domain === 'N/A' || domain === '...') return;
+
+    chrome.runtime.sendMessage({ type: 'GET_WHITELIST' }, res => {
+      const wl = res?.whitelist || [];
+      const type = wl.includes(domain) ? 'REMOVE_WHITELIST' : 'ADD_WHITELIST';
+      chrome.runtime.sendMessage({ type, domain }, () => {
+        if (type === 'ADD_WHITELIST') {
+          whitelistBtn.querySelector('.btn-icon').textContent = '❌';
+          whitelistBtn.querySelector('span:last-child').textContent = 'Unwhitelist';
+          statusDot?.classList.remove('active');
+        } else {
+          whitelistBtn.querySelector('.btn-icon').textContent = '⭐';
+          whitelistBtn.querySelector('span:last-child').textContent = 'Whitelist';
+          statusDot?.classList.add('active');
+        }
+      });
+    });
+  });
+
   // ---- Element Picker ----
-  elementPickerBtn.addEventListener('click', () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  pickerBtn.addEventListener('click', () => {
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
       if (tabs[0]) {
         chrome.tabs.sendMessage(tabs[0].id, { type: 'START_ELEMENT_PICKER' });
         window.close();
@@ -130,64 +138,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ---- Whitelist Current Site ----
-  whitelistBtn.addEventListener('click', () => {
-    const domain = currentDomainEl.textContent;
-    if (!domain || domain === 'N/A' || domain === 'Loading...') return;
-
-    chrome.runtime.sendMessage({ type: 'GET_WHITELIST' }, (response) => {
-      const whitelist = response?.whitelist || [];
-      if (whitelist.includes(domain)) {
-        // Remove from whitelist
-        chrome.runtime.sendMessage({ type: 'REMOVE_WHITELIST', domain }, () => {
-          whitelistBtn.querySelector('.btn-icon').textContent = '✅';
-          whitelistBtn.querySelector('span:last-child').textContent = 'Whitelist';
-          statusDot.classList.add('active');
-        });
-      } else {
-        // Add to whitelist
-        chrome.runtime.sendMessage({ type: 'ADD_WHITELIST', domain }, () => {
-          whitelistBtn.querySelector('.btn-icon').textContent = '❌';
-          whitelistBtn.querySelector('span:last-child').textContent = 'Unwhitelist';
-          statusDot.classList.remove('active');
-        });
-      }
-    });
-  });
-
-  // ---- Check if current site is whitelisted ----
-  function checkWhitelistStatus() {
-    const domain = currentDomainEl.textContent;
-    if (!domain || domain === 'N/A' || domain === 'Loading...') return;
-
-    chrome.runtime.sendMessage({ type: 'GET_WHITELIST' }, (response) => {
-      const whitelist = response?.whitelist || [];
-      if (whitelist.includes(domain)) {
-        whitelistBtn.querySelector('.btn-icon').textContent = '❌';
-        whitelistBtn.querySelector('span:last-child').textContent = 'Unwhitelist';
-        statusDot.classList.remove('active');
-      }
-    });
-  }
-
-  // ---- Reset Stats ----
+  // ---- Reset ----
   resetBtn.addEventListener('click', () => {
-    // Animate numbers to 0
-    [totalEl, adsEl, trackersEl, allTimeEl].forEach(el => {
-      animateCount(el, 0, 500);
-    });
+    [totalEl, adsEl, trackersEl, allTimeEl].forEach(el => animateTo(el, 0, 500));
     progressFill.style.width = '0%';
-    protectionText.textContent = 'Building';
-    protectionText.style.color = '#e74c3c';
-
+    protection.textContent = 'Building';
+    protection.style.color = '#ff4757';
     chrome.runtime.sendMessage({ type: 'RESET_STATS' });
   });
 
-  // ---- Auto-refresh stats every 2s ----
+  // ---- Auto-refresh ----
   setInterval(loadStats, 2000);
 
-  // ---- Initialize ----
+  // ---- Init ----
   loadStats();
-  loadEnabled();
-  setTimeout(checkWhitelistStatus, 500);
+  loadToggle();
 });
